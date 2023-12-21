@@ -79,9 +79,8 @@ contract UniswapV2Pair is ERC20, Math {
 
         // Update the reserves
         _update(balance0, balance1, reserve0_, reserve1_);
-        // Transfer the tokens to the recipient
-        if (amount0Out > 0) _safeTransfer(token0, to, amount0Out);
-        if (amount1Out > 0) _safeTransfer(token1, to, amount1Out);
+        if (amount0Out > 0) _safeTransfer(token0, to, amount0Out); // optimistically transfer tokens
+        if (amount1Out > 0) _safeTransfer(token1, to, amount1Out); // optimistically transfer tokens
 
         emit Swap(msg.sender, amount0Out, amount1Out, to);
     }
