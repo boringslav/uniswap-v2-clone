@@ -36,6 +36,7 @@ contract UniswapV2Pair is ERC20, Math {
     address public token0;
     address public token1;
 
+    // reservers and blockTiempstampLast are stored in one storage slot
     uint112 private reserve0;
     uint112 private reserve1;
     uint32 private blockTimestampLast;
@@ -184,6 +185,8 @@ contract UniswapV2Pair is ERC20, Math {
      * @param token The address of the token to transfer
      * @param to    The address to transfer the tokens to
      * @param value The amount of tokens to transfer
+     * @dev This is used because some tokens don't return a boolean value on success
+     * @dev We check the transfer result to make sure the transfer succeeded
      */
 
     function _safeTransfer(address token, address to, uint256 value) private {
