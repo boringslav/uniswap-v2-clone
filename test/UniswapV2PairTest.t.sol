@@ -2,7 +2,7 @@
 pragma solidity 0.8.21;
 
 import {Test} from "forge-std/Test.sol";
-import {UniswapV2Pair} from "../src/UniswapV2Pair.sol";
+import {UniswapV2Pair, InsufficientOutputAmount, InvalidK} from "../src/UniswapV2Pair.sol";
 import {ERC20Mintable} from "./mocks/ERC20Mintable.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 
@@ -124,6 +124,88 @@ contract UniswapV2PairTest is Test {
         assertEq(pair.totalSupply(), 1 ether);
         assertEq(token0.balanceOf(address(this)), 10 ether - 0.5 ether);
         assertEq(token1.balanceOf(address(this)), 10 ether);
+    }
+
+    function testSwap() public {
+        token0.transfer(address(pair), 1 ether);
+        token1.transfer(address(pair), 2 ether);
+        pair.mint();
+
+        // transfer the token that we want to trade in
+        token0.transfer(address(pair), 0.1 ether);
+        // swap 0.1 ether of token0 to token1 (0.18 ether)
+        pair.swap(0, 0.18 ether, address(this));
+
+        assertEq(token0.balanceOf(address(this)), 10 ether - 1 ether - 0.1 ether, "unexpected token0 balance");
+        assertEq(token1.balanceOf(address(this)), 10 ether - 2 ether + 0.18 ether, "unexpected token1 balance");
+        assertReserves(1 ether + 0.1 ether, 2 ether - 0.18 ether);
+    }
+
+    function testSwapReversedDirection() public {
+        token0.transfer(address(pair), 1 ether);
+        token1.transfer(address(pair), 2 ether);
+        pair.mint();
+
+        // transfer the token that we want to trade in
+        token1.transfer(address(pair), 0.2 ether);
+        pair.swap(0.09 ether, 0, address(this));
+
+        assertEq(token0.balanceOf(address(this)), 10 ether - 1 ether + 0.09 ether, "unexpected token0 balance");
+        assertEq(token1.balanceOf(address(this)), 10 ether - 2 ether - 0.2 ether, "unexpected token1 balance");
+        assertReserves(1 ether - 0.09 ether, 2 ether + 0.2 ether);
+    }
+
+    function testSwapBidirectional() public {
+        token0.transfer(address(pair), 1 ether);
+        token1.transfer(address(pair), 2 ether);
+        pair.mint();
+
+        // transfer the tokens that we want to trade in
+        token0.transfer(address(pair), 0.1 ether);
+        token1.transfer(address(pair), 0.2 ether);
+
+        pair.swap(0.09 ether, 0.18 ether, address(this));
+
+        assertEq(token0.balanceOf(address(this)), 10 ether - 1 ether - 0.01 ether, "unexpected token0 balance");
+        assertEq(token1.balanceOf(address(this)), 10 ether - 2 ether - 0.02 ether, "unexpected token1 balance");
+        assertReserves(1 ether + 0.01 ether, 2 ether + 0.02 ether);
+    }
+
+    function testSwapZeroOut() public {
+        token0.transfer(address(pair), 1 ether);
+        token1.transfer(address(pair), 2 ether);
+        pair.mint();
+
+        vm.expectRevert(InsufficientOutputAmount.selector);
+        pair.swap(0, 0, address(this));
+    }
+
+    function testSwapUnderpriced() public {
+        token0.transfer(address(pair), 1 ether);
+        token1.transfer(address(pair), 2 ether);
+        pair.mint();
+
+        token0.transfer(address(pair), 0.1 ether);
+        pair.swap(0, 0.09 ether, address(this));
+
+        assertEq(token0.balanceOf(address(this)), 10 ether - 1 ether - 0.1 ether, "unexpected token0 balance");
+        assertEq(token1.balanceOf(address(this)), 10 ether - 2 ether + 0.09 ether, "unexpected token1 balance");
+        assertReserves(1 ether + 0.1 ether, 2 ether - 0.09 ether);
+    }
+
+    function testSwapOverpriced() public {
+        token0.transfer(address(pair), 1 ether);
+        token1.transfer(address(pair), 2 ether);
+        pair.mint();
+
+        token0.transfer(address(pair), 0.1 ether);
+
+        vm.expectRevert(InvalidK.selector);
+        pair.swap(0, 0.36 ether, address(this));
+
+        assertEq(token0.balanceOf(address(this)), 10 ether - 1 ether - 0.1 ether, "unexpected token0 balance");
+        assertEq(token1.balanceOf(address(this)), 10 ether - 2 ether, "unexpected token1 balance");
+        assertReserves(1 ether, 2 ether);
     }
 
     function assertReserves(uint112 expectedReserve0, uint112 expectedReserve1) internal {
