@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.21;
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
@@ -12,6 +12,7 @@ error InsufficientOutputAmount();
 error InsufficientLiquidity();
 error InvalidK();
 error BalanceOverflow();
+error AlreadyInitialized();
 
 interface IERC20 {
     function balanceOf(address) external returns (uint256);
@@ -47,6 +48,21 @@ contract UniswapV2Pair is ERC20, Math {
     constructor(address _token0, address _token1) ERC20("Uniswap V2 Pair", "Pair", 18) {
         token0 = _token0;
         token1 = _token1;
+    }
+
+    /**
+     * @notice Initializes the contract (sets the addresses of the tokens)
+     * @param token0_  The address of the first token
+     * @param token1_  The address of the second token
+     * @dev This function can only be called once. It is called by the UniswapV2Factory contract
+     */
+    function initialize(address token0_, address token1_) public {
+        if (token0 != address(0) || token1 != address(0)) {
+            revert AlreadyInitialized();
+        }
+
+        token0 = token0_;
+        token1 = token1_;
     }
 
     /**
