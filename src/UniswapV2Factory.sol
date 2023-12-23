@@ -8,6 +8,11 @@ error IdenticalAddresses();
 error PairExists();
 error ZeroAddress();
 
+/**
+ * @title UniswapV2Factory
+ * @author Borislav Stoyanov
+ * @notice  This contract is used for creating UniswapV2Pair contracts and to keep track of them
+ */
 contract UniswapV2Factory {
     event PairCreated(address indexed token0, address indexed token1, address pair, uint256);
 
