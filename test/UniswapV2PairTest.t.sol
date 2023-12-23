@@ -28,7 +28,7 @@ contract UniswapV2PairTest is Test {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 1 ether);
 
-        pair.mint(); // + 1 LP
+        pair.mint(address(this)); // + 1 LP
 
         assertEq(pair.balanceOf(address(this)), 1 ether - MINIMUM_LIQUIDITY);
         assertReserves(1 ether, 1 ether);
@@ -39,12 +39,12 @@ contract UniswapV2PairTest is Test {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 1 ether);
 
-        pair.mint(); // + 1 LP
+        pair.mint(address(this)); // + 1 LP
 
         token0.transfer(address(pair), 2 ether);
         token1.transfer(address(pair), 2 ether);
 
-        pair.mint(); // + 2 LP
+        pair.mint(address(this)); // + 2 LP
 
         assertEq(pair.balanceOf(address(this)), 3 ether - 1000);
         assertEq(pair.totalSupply(), 3 ether);
@@ -55,53 +55,55 @@ contract UniswapV2PairTest is Test {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 1 ether);
 
-        pair.mint(); // + 1 LP
+        pair.mint(address(this)); // + 1 LP
         assertEq(pair.balanceOf(address(this)), 1 ether - 1000);
         assertReserves(1 ether, 1 ether);
 
         token0.transfer(address(pair), 2 ether);
         token1.transfer(address(pair), 1 ether);
 
-        pair.mint(); // + 1 LP
+        pair.mint(address(this)); // + 1 LP
         assertEq(pair.balanceOf(address(this)), 2 ether - 1000);
         assertReserves(3 ether, 2 ether);
     }
 
     function testBurn() public {
-        // Provide initial liquidity
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 1 ether);
 
-        pair.mint();
-        pair.burn();
+        pair.mint(address(this));
+
+        uint256 liquidity = pair.balanceOf(address(this));
+        pair.transfer(address(pair), liquidity);
+        pair.burn(address(this));
 
         assertEq(pair.balanceOf(address(this)), 0);
         assertReserves(1000, 1000);
         assertEq(pair.totalSupply(), 1000);
-        assertEq(token0.balanceOf(address(this)), 10 ether - MINIMUM_LIQUIDITY);
-        assertEq(token1.balanceOf(address(this)), 10 ether - MINIMUM_LIQUIDITY);
+        assertEq(token0.balanceOf(address(this)), 10 ether - 1000);
+        assertEq(token1.balanceOf(address(this)), 10 ether - 1000);
     }
 
     function testBurnUnbalanced() public {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 1 ether);
 
-        pair.mint();
+        pair.mint(address(this));
 
         token0.transfer(address(pair), 2 ether);
         token1.transfer(address(pair), 1 ether);
 
-        pair.mint(); // + 1 LP
+        pair.mint(address(this)); // + 1 LP
 
-        pair.burn();
+        uint256 liquidity = pair.balanceOf(address(this));
+        pair.transfer(address(pair), liquidity);
+        pair.burn(address(this));
 
         assertEq(pair.balanceOf(address(this)), 0);
         assertReserves(1500, 1000);
         assertEq(pair.totalSupply(), 1000);
-        // Here additional 500 wei is lost from token0.
-        // This is the punishment price for price manipulaiton.
         assertEq(token0.balanceOf(address(this)), 10 ether - 1500);
-        assertEq(token1.balanceOf(address(this)), 10 ether - MINIMUM_LIQUIDITY);
+        assertEq(token1.balanceOf(address(this)), 10 ether - 1000);
     }
 
     function testBurnUnbalancedDifferentUsers() public {
@@ -114,9 +116,11 @@ contract UniswapV2PairTest is Test {
         token0.transfer(address(pair), 2 ether);
         token1.transfer(address(pair), 1 ether);
 
-        pair.mint(); // + 1 LP
+        pair.mint(address(this)); // + 1 LP
 
-        pair.burn();
+        uint256 liquidity = pair.balanceOf(address(this));
+        pair.transfer(address(pair), liquidity);
+        pair.burn(address(this));
 
         // this user is penalized for providing unbalanced liquidity
         assertEq(pair.balanceOf(address(this)), 0);
@@ -124,12 +128,21 @@ contract UniswapV2PairTest is Test {
         assertEq(pair.totalSupply(), 1 ether);
         assertEq(token0.balanceOf(address(this)), 10 ether - 0.5 ether);
         assertEq(token1.balanceOf(address(this)), 10 ether);
+
+        testUser.removeLiquidity(address(pair));
+
+        // testUser receives the amount collected from this user
+        assertEq(pair.balanceOf(address(testUser)), 0);
+        assertReserves(1500, 1000);
+        assertEq(pair.totalSupply(), 1000);
+        assertEq(token0.balanceOf(address(testUser)), 10 ether + 0.5 ether - 1500);
+        assertEq(token1.balanceOf(address(testUser)), 10 ether - 1000);
     }
 
     function testSwap() public {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 2 ether);
-        pair.mint();
+        pair.mint(address(this));
 
         // transfer the token that we want to trade in
         token0.transfer(address(pair), 0.1 ether);
@@ -144,7 +157,7 @@ contract UniswapV2PairTest is Test {
     function testSwapReversedDirection() public {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 2 ether);
-        pair.mint();
+        pair.mint(address(this));
 
         // transfer the token that we want to trade in
         token1.transfer(address(pair), 0.2 ether);
@@ -158,7 +171,7 @@ contract UniswapV2PairTest is Test {
     function testSwapBidirectional() public {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 2 ether);
-        pair.mint();
+        pair.mint(address(this));
 
         // transfer the tokens that we want to trade in
         token0.transfer(address(pair), 0.1 ether);
@@ -174,7 +187,7 @@ contract UniswapV2PairTest is Test {
     function testSwapZeroOut() public {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 2 ether);
-        pair.mint();
+        pair.mint(address(this));
 
         vm.expectRevert(InsufficientOutputAmount.selector);
         pair.swap(0, 0, address(this));
@@ -183,7 +196,7 @@ contract UniswapV2PairTest is Test {
     function testSwapUnderpriced() public {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 2 ether);
-        pair.mint();
+        pair.mint(address(this));
 
         token0.transfer(address(pair), 0.1 ether);
         pair.swap(0, 0.09 ether, address(this));
@@ -196,7 +209,7 @@ contract UniswapV2PairTest is Test {
     function testSwapOverpriced() public {
         token0.transfer(address(pair), 1 ether);
         token1.transfer(address(pair), 2 ether);
-        pair.mint();
+        pair.mint(address(this));
 
         token0.transfer(address(pair), 0.1 ether);
 
@@ -226,10 +239,16 @@ contract TestUser {
         ERC20(token0Address_).transfer(pairAddress_, amount0_);
         ERC20(token1Address_).transfer(pairAddress_, amount1_);
 
-        UniswapV2Pair(pairAddress_).mint();
+        UniswapV2Pair(pairAddress_).mint(address(this));
     }
 
     function withdrawLiquidity(address pairAddress_) public {
-        UniswapV2Pair(pairAddress_).burn();
+        UniswapV2Pair(pairAddress_).burn(msg.sender);
+    }
+
+    function removeLiquidity(address pairAddress_) public {
+        uint256 liquidity = ERC20(pairAddress_).balanceOf(address(this));
+        ERC20(pairAddress_).transfer(pairAddress_, liquidity);
+        UniswapV2Pair(pairAddress_).burn(address(this));
     }
 }

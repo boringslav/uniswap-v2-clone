@@ -28,7 +28,7 @@ contract UniswapV2Pair is ERC20, Math {
     using UQ112x112 for uint224;
 
     event Mint(address indexed sender, uint256 amount0, uint256 amount1);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address to);
     event Swap(address indexed sender, uint256 amount0Out, uint256 amount1Out, address to);
     event Sync(uint112 reserve0, uint112 reserve1);
 
@@ -106,7 +106,7 @@ contract UniswapV2Pair is ERC20, Math {
      * @notice Mint liquidity tokens to provide liquidity
      * @dev The amount of liquidity tokens minted is proportional to the amount of tokens provided
      */
-    function mint() public {
+    function mint(address _to) public {
         (uint112 _reserve0, uint112 _reserve1,) = getReserves();
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
@@ -135,11 +135,11 @@ contract UniswapV2Pair is ERC20, Math {
 
         if (liquidity <= 0) revert InsufficientLiquidityMinted();
 
-        _mint(msg.sender, liquidity);
+        _mint(_to, liquidity);
 
         _update(balance0, balance1, _reserve0, _reserve1);
 
-        emit Mint(msg.sender, amount0, amount1);
+        emit Mint(_to, amount0, amount1);
     }
 
     /**
@@ -148,27 +148,28 @@ contract UniswapV2Pair is ERC20, Math {
      *  UniswapV2 doesn't support partial burning,
      *  so the amount of liquidity tokens burned must be equal to the total amount of liquidity tokens held by the user
      */
-    function burn() public {
+    function burn(address to) public returns (uint256 amount0, uint256 amount1) {
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
-        uint256 liquidity = balanceOf[msg.sender];
+        uint256 liquidity = balanceOf[address(this)];
 
-        uint256 amount0 = (liquidity * balance0) / totalSupply;
-        uint256 amount1 = (liquidity * balance1) / totalSupply;
+        amount0 = (liquidity * balance0) / totalSupply;
+        amount1 = (liquidity * balance1) / totalSupply;
 
-        if (amount0 <= 0 || amount1 <= 0) revert InsufficientLiquidityBurned();
+        if (amount0 == 0 || amount1 == 0) revert InsufficientLiquidityBurned();
 
-        _burn(msg.sender, liquidity);
+        _burn(address(this), liquidity);
 
-        _safeTransfer(token0, msg.sender, amount0);
-        _safeTransfer(token1, msg.sender, amount1);
+        _safeTransfer(token0, to, amount0);
+        _safeTransfer(token1, to, amount1);
 
         balance0 = IERC20(token0).balanceOf(address(this));
         balance1 = IERC20(token1).balanceOf(address(this));
 
-        _update(balance0, balance1, reserve0, reserve1);
+        (uint112 reserve0_, uint112 reserve1_,) = getReserves();
+        _update(balance0, balance1, reserve0_, reserve1_);
 
-        emit Burn(msg.sender, amount0, amount1);
+        emit Burn(msg.sender, amount0, amount1, to);
     }
 
     /**
