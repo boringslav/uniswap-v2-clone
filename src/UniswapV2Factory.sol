@@ -27,6 +27,13 @@ contract UniswapV2Factory {
         // sort token addresses to avoid duplicate pairs (token0, token1) vs (token1, token0)
         (address token0, address token1) = _token0 < _token1 ? (_token0, _token1) : (_token1, _token0);
 
+        if (token0 == address(0)) {
+            revert ZeroAddress();
+        }
+        if (pairs[token0][token1] != address(0)) {
+            revert PairExists();
+        }
+
         // Creation code includes constructor code (not stored on the blokchain),
         // runtime bytecode - business logic (stored on the blockchain)
         bytes memory bytecode = type(UniswapV2Pair).creationCode;
@@ -35,7 +42,7 @@ contract UniswapV2Factory {
             pair := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
 
-        IUniswapV2Pair(pair).initialize(token0, token1);
+        UniswapV2Pair(pair).initialize(token0, token1);
 
         pairs[token0][token1] = pair;
         pairs[token1][token0] = pair;
